@@ -1,5 +1,9 @@
 import json
+from collections import defaultdict
+
+import numpy
 import scipy.io as sio
+import scipy.sparse
 import scipy.sparse as sp
 import numpy as np
 import torch
@@ -42,7 +46,8 @@ def data_preprocess(dataset: str):
     train_class_list: list = list()
     test_class_list: list = list()
     valid_class_list: list = list()
-    train_class_list, valid_class_list, test_class_list = json.load(open('./dataset/{}_class_split.json'.format(dataset)))
+    train_class_list, valid_class_list, test_class_list = json.load(
+        open('./dataset/{}_class_split.json'.format(dataset)))
     if dataset == "Amazon_eletronics" or dataset == 'dblp':
         # all the edges in graph is denoted by (node1[i], node2[i])
         node1: list = list()
@@ -71,10 +76,11 @@ def data_preprocess(dataset: str):
         adjacency_matrix = sp.coo_matrix((np.ones(len(node1)), (node1, node2)), shape=(node_number, node_number))
 
         # all the classes in a list
-        class_list: list = []
+        all_class_list: list = []
         for cls in labels:
-            if cls[0] not in class_list:
-                class_list.append(cls[0])
+            if cls[0] not in all_class_list:
+                all_class_list.append(cls[0])
+
         # class_id -> [node_id, node_id, ...]
         class_dict: dict = {}
         for cls in class_dict:
@@ -86,12 +92,69 @@ def data_preprocess(dataset: str):
         labels = label_binarizer.fit_transform(labels)
         features_matrix = torch.FloatTensor(features_matrix)
         labels = torch.LongTensor(np.where(labels)[1])
-        adjacency_matrix = sparse_matrix2torch_sparse_tensor(normalize(adjacency_matrix + sp.eye(adjacency_matrix.shape[0])))
+        adjacency_matrix = sparse_matrix2torch_sparse_tensor(
+            normalize(adjacency_matrix + sp.eye(adjacency_matrix.shape[0])))
+    '''
     elif dataset == 'cora-full':
         pass
     elif dataset == 'ogbn-arxiv':
         pass
+    '''
+    # store node id
+    train_node_index: list = list()
+    valid_node_index: list = list()
+    test_node_index: list = list()
+    for idx, class_list in zip([train_node_index, valid_node_index, test_node_index],
+                               [train_class_list, valid_class_list, test_class_list]):
+        for class_id in class_list:
+            idx.append(class_dict[class_id])
+
+    class_train_dict = defaultdict(list)
+    for one in train_class_list:
+        for i, label in enumerate(labels.numpy().tolist()):
+            if label == one:
+                class_train_dict[one].append(i)
+    class_valid_dict = defaultdict(list)
+    for one in valid_class_list:
+        for i, label in enumerate(labels.numpy().tolist()):
+            if label == one:
+                class_valid_dict[one].append(i)
+
+    class_test_dict = defaultdict(list)
+    for one in test_class_list:
+        for i, label in enumerate(labels.numpy().tolist()):
+            if label == one:
+                class_test_dict[one].append(i)
+
+    graph = Graph(adjacency_matrix, features_matrix, labels,
+                  train_node_index, valid_node_index, test_node_index,
+                  node1, node2,
+                  class_train_dict, class_valid_dict, class_test_dict)
+
+    return graph
 
 
-if __name__ == '__main__':
-    data_preprocess("Amazon_eletronics")
+class Graph:
+    """ class Graph is used to store the information of a graph,
+        including adjacency_matrix, features_matrix, and etc.
+
+    """
+
+    def __init__(self, adjacency_matrix, features_matrix, labels,
+                 train_node_index, valid_node_index, test_node_index,
+                 node1, node2,
+                 class_train_dict, class_valid_dict, class_test_dict):
+        self.adjacency_matrix = adjacency_matrix
+        self.features_matrix = features_matrix
+        self.labels = labels
+
+        self.train_node_index: list = train_node_index
+        self.valid_node_index: list = valid_node_index
+        self.test_node_index: list = test_node_index
+
+        self.node1: list = node1
+        self.node2: list = node2
+
+        self.class_train_dict: defaultdict = class_train_dict
+        self.class_valid_dict: defaultdict = class_valid_dict
+        self.class_test_dict: defaultdict = class_test_dict
