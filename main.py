@@ -14,11 +14,11 @@ from model import GNN4ClassLevel, GNN4NodeLevel, Linear
 from utils import l2_normalize, accuracy, InforNCE_Loss
 
 # the name of dataset
-datasets = ['cora-full', 'Amazon_eletronics', 'dblp', 'ogbn-arxiv']
+datasets = ['cora-full', 'Amazon_eletronics', 'dblp']
 CORA_FULL = 'cora-full'
 AMAZON_ELECTRONICS = 'Amazon_eletronics'
 DBLP = 'dblp'
-OGBN_ARXIV = 'ogbn-arxiv'
+
 
 # the name of mode
 TRAIN = 'train'
@@ -92,10 +92,7 @@ def train_and_test():
         graph = data_preprocess(dataset)
 
         adjacency_matrix = graph.adjacency_matrix.to_dense()
-        if dataset != OGBN_ARXIV:
-            adjacency_matrix = adjacency_matrix.cuda()
-        else:
-            args.use_cuda = False
+        adjacency_matrix = adjacency_matrix.cuda()
 
         for n in Ns:
             for k in Ks:
@@ -232,8 +229,8 @@ def calculate_accuracy(class_level_model: GNN4ClassLevel, node_level_model: GNN4
 
         pos_graph_feat = torch.cat(
             [node_features[class_pos_index].mean(0, keepdim=True), node_features[pos_graph_neighbors]], 0)
-        if dataset != OGBN_ARXIV:
-            pos_class_graph_adj = pos_class_graph_adj.cuda()
+
+        pos_class_graph_adj = pos_class_graph_adj.cuda()
 
         pos_graph_adj_and_feat.append((pos_class_graph_adj, pos_graph_feat))
 

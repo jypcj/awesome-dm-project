@@ -39,11 +39,10 @@ from utils import normalize, sparse_matrix2torch_sparse_tensor
 
 
 # the name of dataset
-datasets = ['cora-full', 'Amazon_eletronics', 'dblp', 'ogbn-arxiv']
+datasets = ['cora-full', 'Amazon_eletronics', 'dblp']
 CORA_FULL = 'cora-full'
 AMAZON_ELECTRONICS = 'Amazon_eletronics'
 DBLP = 'dblp'
-OGBN_ARXIV = 'ogbn-arxiv'
 
 
 def data_preprocess(dataset: str):
@@ -111,8 +110,6 @@ def data_preprocess(dataset: str):
         # print(labels)
     '''
     elif dataset == 'cora-full':
-        pass
-    elif dataset == 'ogbn-arxiv':
         pass
     '''
     # store node id

@@ -52,8 +52,8 @@ def InforNCE_Loss(anchor, sample, tau, dataset, all_negative=False, temperature_
     assert anchor.shape[0] == sample.shape[0]
 
     pos_mask = torch.eye(anchor.shape[0], dtype=torch.float)
-    if dataset != 'ogbn-arxiv':
-        pos_mask = pos_mask.cuda()
+
+    pos_mask = pos_mask.cuda()
 
     neg_mask = 1. - pos_mask
 
