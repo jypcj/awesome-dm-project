@@ -5,9 +5,9 @@ import numpy as np
 
 
 # node-level adaption model
-class GraphConvolutionNode(torch.nn.Module):
+class GraphNeuralNode(torch.nn.Module):
     def __init__(self, in_features, out_features, bias=True):
-        super(GraphConvolutionNode, self).__init__()
+        super(GraphNeuralNode, self).__init__()
         self.in_features = in_features
         self.out_features = out_features
         self.weight = Parameter(torch.FloatTensor(in_features, out_features))
@@ -38,13 +38,13 @@ class GraphConvolutionNode(torch.nn.Module):
 
 
 # used in node-level adaption
-class GCN4NodeLevel(torch.nn.Module):
+class GNN4NodeLevel(torch.nn.Module):
     # 构建模型
-    def __init__(self, nfeat, nhid, nclass, dropout):
-        super(GCN4NodeLevel, self).__init__()
+    def __init__(self, nfeat, nhid, dropout):
+        super(GNN4NodeLevel, self).__init__()
 
-        self.gc1 = GraphConvolutionNode(nfeat, nhid)
-        self.gc2 = GraphConvolutionNode(nhid, nhid)
+        self.gc1 = GraphNeuralNode(nfeat, nhid)
+        self.gc2 = GraphNeuralNode(nhid, nhid)
         self.dropout = dropout
 
     # 前向传播
@@ -53,9 +53,9 @@ class GCN4NodeLevel(torch.nn.Module):
 
 
 # node-level adaption model
-class GraphConvolutionClass(torch.nn.Module):
+class GraphNeuralClass(torch.nn.Module):
     def __init__(self, in_features, out_features, bias=True):
-        super(GraphConvolutionClass, self).__init__()
+        super(GraphNeuralClass, self).__init__()
         self.in_features = in_features
         self.out_features = out_features
         self.weight = Parameter(torch.FloatTensor(in_features, out_features))
@@ -93,12 +93,12 @@ class GraphConvolutionClass(torch.nn.Module):
 
 
 # used in node-level adaption
-class GCN4ClassLevel(torch.nn.Module):
+class GNN4ClassLevel(torch.nn.Module):
     def __init__(self, nfeat, nhid, dropout):
-        super(GCN4ClassLevel, self).__init__()
+        super(GNN4ClassLevel, self).__init__()
 
-        self.gc1 = GraphConvolutionClass(nfeat, nhid)
-        self.gc2 = GraphConvolutionClass(nhid, nhid)
+        self.gc1 = GraphNeuralClass(nfeat, nhid)
+        self.gc2 = GraphNeuralClass(nhid, nhid)
         self.generater = torch.nn.Linear(nfeat, (nfeat + 1) * nhid * 2 + (nhid + 1) * nhid * 2)
 
         self.dropout = dropout
@@ -145,7 +145,7 @@ class Linear(torch.nn.Module):
             self.bias.data.uniform_(-stdv, stdv)
 
     def forward(self, input, w=None, b=None):
-        if w != None:
+        if w is not None:
             return torch.mm(input, w) + b
         else:
             return torch.mm(input, self.weight) + self.bias

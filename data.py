@@ -8,6 +8,9 @@ import scipy.sparse as sp
 import numpy as np
 import torch
 from sklearn import preprocessing
+from scipy.sparse import coo_matrix
+from numpy import ndarray
+
 
 from utils import normalize, sparse_matrix2torch_sparse_tensor
 
@@ -35,14 +38,23 @@ from utils import normalize, sparse_matrix2torch_sparse_tensor
 '''
 
 
+# the name of dataset
+datasets = ['cora-full', 'Amazon_eletronics', 'dblp', 'ogbn-arxiv']
+CORA_FULL = 'cora-full'
+AMAZON_ELECTRONICS = 'Amazon_eletronics'
+DBLP = 'dblp'
+OGBN_ARXIV = 'ogbn-arxiv'
+
+
 def data_preprocess(dataset: str):
     """pre-process the data before training
 
         Parameter:
             dataset: the name of dataset, including 'Amazon_eletronics', 'dblp', 'cora-full' and 'ogbn-arxiv'
         Return:
-
+            graph: an object of Graph class, storing a graph data
     """
+    # [class0_id, class1_id, class2_id, ...]
     train_class_list: list = list()
     test_class_list: list = list()
     valid_class_list: list = list()
@@ -68,6 +80,7 @@ def data_preprocess(dataset: str):
         labels = np.zeros((node_number, 1))
         labels[data_train['Index']] = data_train["Label"]
         labels[data_test['Index']] = data_test["Label"]
+        print(labels)
         # feature matrix
         features_matrix = np.zeros((node_number, data_train["Attributes"].shape[1]))
         features_matrix[data_train['Index']] = data_train["Attributes"].toarray()
@@ -81,19 +94,21 @@ def data_preprocess(dataset: str):
             if cls[0] not in all_class_list:
                 all_class_list.append(cls[0])
 
-        # class_id -> [node_id, node_id, ...]
+        # {class_id -> [node_id, node_id, ...]}
         class_dict: dict = {}
-        for cls in class_dict:
+        for cls in all_class_list:
             class_dict[cls] = []
-        for node_id, class_id in labels:
+        for node_id, class_id in enumerate(labels):
             class_dict[class_id[0]].append(node_id)
 
         label_binarizer = preprocessing.LabelBinarizer()
         labels = label_binarizer.fit_transform(labels)
         features_matrix = torch.FloatTensor(features_matrix)
+        # labels = tensor([99, 61, 99, ..., 57, 97, 34])
         labels = torch.LongTensor(np.where(labels)[1])
         adjacency_matrix = sparse_matrix2torch_sparse_tensor(
             normalize(adjacency_matrix + sp.eye(adjacency_matrix.shape[0])))
+        # print(labels)
     '''
     elif dataset == 'cora-full':
         pass
@@ -109,6 +124,7 @@ def data_preprocess(dataset: str):
         for class_id in class_list:
             idx.append(class_dict[class_id])
 
+    # {class_id => [node0_id, node1_id, ...]}
     class_train_dict = defaultdict(list)
     for one in train_class_list:
         for i, label in enumerate(labels.numpy().tolist()):
@@ -144,9 +160,10 @@ class Graph:
                  train_node_index, valid_node_index, test_node_index,
                  node1, node2,
                  class_train_dict, class_valid_dict, class_test_dict):
-        self.adjacency_matrix = adjacency_matrix
-        self.features_matrix = features_matrix
-        self.labels = labels
+
+        self.adjacency_matrix: coo_matrix = adjacency_matrix
+        self.features_matrix: ndarray = features_matrix
+        self.labels: ndarray = labels
 
         self.train_node_index: list = train_node_index
         self.valid_node_index: list = valid_node_index
@@ -158,3 +175,7 @@ class Graph:
         self.class_train_dict: defaultdict = class_train_dict
         self.class_valid_dict: defaultdict = class_valid_dict
         self.class_test_dict: defaultdict = class_test_dict
+
+
+if __name__ == '__main__':
+    data_preprocess(AMAZON_ELECTRONICS)
