@@ -44,8 +44,34 @@ CORA_FULL = 'cora-full'
 AMAZON_ELECTRONICS = 'Amazon_eletronics'
 DBLP = 'dblp'
 
+# directory of dataset
+dataset_dir = "./dataset/"
 
-def data_preprocess(dataset: str):
+
+class Graph:
+    """ class Graph is used to store the information of a graph,
+        including adjacency_matrix, features_matrix, and etc.
+
+    """
+
+    def __init__(self, adjacency_matrix, features_matrix, labels,
+                 train_node_index, valid_node_index, test_node_index,
+                 class_train_dict, class_valid_dict, class_test_dict):
+
+        self.adjacency_matrix: coo_matrix = adjacency_matrix
+        self.features_matrix: ndarray = features_matrix
+        self.labels: ndarray = labels
+
+        self.train_node_index: list = train_node_index
+        self.valid_node_index: list = valid_node_index
+        self.test_node_index: list = test_node_index
+
+        self.class_train_dict: defaultdict = class_train_dict
+        self.class_valid_dict: defaultdict = class_valid_dict
+        self.class_test_dict: defaultdict = class_test_dict
+
+
+def data_preprocess(dataset: str) -> Graph:
     """pre-process the data before training
 
         Parameter:
@@ -58,12 +84,12 @@ def data_preprocess(dataset: str):
     test_class_list: list = list()
     valid_class_list: list = list()
     train_class_list, valid_class_list, test_class_list = json.load(
-        open('./dataset/{}_class_split.json'.format(dataset)))
+        open(dataset_dir + '{}_class_split.json'.format(dataset)))
     if dataset == "Amazon_eletronics" or dataset == 'dblp':
         # all the edges in graph is denoted by (node1[i], node2[i])
         node1: list = list()
         node2: list = list()
-        for line in open("./dataset/{}_network".format(dataset)):
+        for line in open(dataset_dir + "{}_network".format(dataset)):
             n1, n2 = line.strip().split("\t")
             node1.append(int(n1))
             node2.append(int(n2))
@@ -73,13 +99,13 @@ def data_preprocess(dataset: str):
         # Index: [[1,2,3...]]
         # Label: [[1],[1],[2],[2],...]
         # Attributes: matrix
-        data_train: dict = sio.loadmat("./dataset/{}_train.mat".format(dataset))
-        data_test: dict = sio.loadmat("./dataset/{}_test.mat".format(dataset))
+        data_train: dict = sio.loadmat(dataset_dir + "{}_train.mat".format(dataset))
+        data_test: dict = sio.loadmat(dataset_dir + "{}_test.mat".format(dataset))
         # label of nodes
         labels = np.zeros((node_number, 1))
         labels[data_train['Index']] = data_train["Label"]
         labels[data_test['Index']] = data_test["Label"]
-        print(labels)
+        # print(labels)
         # feature matrix
         features_matrix = np.zeros((node_number, data_train["Attributes"].shape[1]))
         features_matrix[data_train['Index']] = data_train["Attributes"].toarray()
@@ -119,7 +145,7 @@ def data_preprocess(dataset: str):
     for idx, class_list in zip([train_node_index, valid_node_index, test_node_index],
                                [train_class_list, valid_class_list, test_class_list]):
         for class_id in class_list:
-            idx.append(class_dict[class_id])
+            idx.extend(class_dict[class_id])
 
     # {class_id => [node0_id, node1_id, ...]}
     class_train_dict = defaultdict(list)
@@ -141,38 +167,22 @@ def data_preprocess(dataset: str):
 
     graph = Graph(adjacency_matrix, features_matrix, labels,
                   train_node_index, valid_node_index, test_node_index,
-                  node1, node2,
                   class_train_dict, class_valid_dict, class_test_dict)
 
     return graph
 
 
-class Graph:
-    """ class Graph is used to store the information of a graph,
-        including adjacency_matrix, features_matrix, and etc.
+
+
+def print_content_to_file(data, file_name):
+    """ This function is used for debugging
 
     """
-
-    def __init__(self, adjacency_matrix, features_matrix, labels,
-                 train_node_index, valid_node_index, test_node_index,
-                 node1, node2,
-                 class_train_dict, class_valid_dict, class_test_dict):
-
-        self.adjacency_matrix: coo_matrix = adjacency_matrix
-        self.features_matrix: ndarray = features_matrix
-        self.labels: ndarray = labels
-
-        self.train_node_index: list = train_node_index
-        self.valid_node_index: list = valid_node_index
-        self.test_node_index: list = test_node_index
-
-        self.node1: list = node1
-        self.node2: list = node2
-
-        self.class_train_dict: defaultdict = class_train_dict
-        self.class_valid_dict: defaultdict = class_valid_dict
-        self.class_test_dict: defaultdict = class_test_dict
+    with open("./debug/" + file_name, 'w') as f:
+        f.write(data)
 
 
 if __name__ == '__main__':
-    data_preprocess(AMAZON_ELECTRONICS)
+    graph = data_preprocess(AMAZON_ELECTRONICS)
+    print(graph.features_matrix.mean())
+

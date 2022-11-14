@@ -19,13 +19,11 @@ CORA_FULL = 'cora-full'
 AMAZON_ELECTRONICS = 'Amazon_eletronics'
 DBLP = 'dblp'
 
-
 # the name of mode
 TRAIN = 'train'
 VALID = 'valid'
 TEST = 'test'
 
-args: argparse.Namespace = argparse.Namespace()
 
 # K and N in experiment
 # k nodes for each of n classes
@@ -40,9 +38,19 @@ repeat_times = 5
 final_results = defaultdict(dict)
 
 # loss function
-loss_function = torch.nn.CrossEntropyLoss
+loss_function = torch.nn.CrossEntropyLoss()
 
-
+# parameters
+class args:
+    use_cuda = True
+    seed = 1234
+    epochs = 2000
+    test_epochs = 100
+    lr = 0.05
+    weight_decay = 5e-4
+    hidden1 = 16
+    hidden2 = 16
+    dropout = 0.2
 
 
 def main():
@@ -50,27 +58,6 @@ def main():
     """
 
     # parameter
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--use_cuda', action='store_true', default=True, help='Disables CUDA training.')
-    parser.add_argument('--seed', type=int, default=1234, help='Random seed.')
-    parser.add_argument('--epochs', type=int, default=2000,
-                        help='Number of epochs to train.')
-    parser.add_argument('--test_epochs', type=int, default=100,
-                        help='Number of epochs to train.')
-    parser.add_argument('--lr', type=float, default=0.05,
-                        help='Initial learning rate.')
-
-    parser.add_argument('--weight_decay', type=float, default=5e-4,  # 5e-4
-                        help='Weight decay (L2 loss on parameters).')
-    parser.add_argument('--hidden1', type=int, default=16,
-                        help='Number of hidden units.')
-    parser.add_argument('--hidden2', type=int, default=16,
-                        help='Number of hidden units.')
-    # dropout rate
-    parser.add_argument('--dropout', type=float, default=0.2,
-                        help='Dropout rate (1 - keep probability).')
-
-    args = parser.parse_args(args=[])
 
     random.seed(args.seed)
     np.random.seed(args.seed)
@@ -78,11 +65,6 @@ def main():
     if args.use_cuda:
         torch.cuda.manual_seed(args.seed)
 
-    # cross-entropy classification loss
-    cross_entropy_loss = torch.nn.CrossEntropyLoss()
-
-    # store the final result
-    # final_results: dict = defaultdict(dict)
     train_and_test()
 
 
@@ -91,13 +73,13 @@ def train_and_test():
     for dataset in datasets:
         graph = data_preprocess(dataset)
 
-        adjacency_matrix = graph.adjacency_matrix.to_dense()
-        adjacency_matrix = adjacency_matrix.cuda()
+        adj_dense = graph.adjacency_matrix.to_dense()
+        adj_dense = adj_dense.cuda()
 
         for n in Ns:
             for k in Ks:
                 for repeat in range(repeat_times):
-                    print("begin", dataset, "n= ", n, "k= ", k)
+                    print("begin ", dataset, "n= ", n, "k= ", k)
 
                     # two models in class-level and node level adaption
                     node_level_model: GNN4NodeLevel = GNN4NodeLevel(nfeat=graph.features_matrix.shape[1],
@@ -116,7 +98,8 @@ def train_and_test():
 
                     classifier: Linear = Linear(args.hidden1, graph.labels.max().item() + 1)
                     optimizer: optim.Adam = optim.Adam(
-                        [{'params': class_level_model.parameters()}, {'params': classifier.parameters()},
+                        [{'params': class_level_model.parameters()},
+                         {'params': classifier.parameters()},
                          {'params': node_level_model.parameters()}],
                         lr=args.lr, weight_decay=args.weight_decay)
 
@@ -133,21 +116,51 @@ def train_and_test():
                         support_labels = support_labels.cuda()
                         query_labels = query_labels.cuda()
 
+                    # begin to train and test
                     cnt: int = 0
                     valid_accuracy_best: float = 0.0
                     test_accuracy_best: list = []
                     for epoch in range(args.epochs):
-                        train_accuracy: float = calculate_accuracy(TRAIN)
+                        train_accuracy: float = calculate_accuracy(class_level_model=class_level_model,
+                                                                   node_level_model=node_level_model,
+                                                                   optimizer=optimizer,
+                                                                   classifier=classifier,
+                                                                   graph=graph,
+                                                                   adj_dense=adj_dense,
+                                                                   dataset=dataset,
+                                                                   epoch=epoch,
+                                                                   n=n, k=k,
+                                                                   mode=TRAIN)
 
                         # epoch for test and valid
                         if epoch % 50 == 0 and epoch != 0:
                             tmp_accuracies: list = []
                             for test_epoch in range(50):
-                                tmp_accuracies.append(calculate_accuracy(TEST))
+                                tmp_accuracy = calculate_accuracy(class_level_model=class_level_model,
+                                                                  node_level_model=node_level_model,
+                                                                  optimizer=optimizer,
+                                                                  classifier=classifier,
+                                                                  graph=graph,
+                                                                  adj_dense=adj_dense,
+                                                                  dataset=dataset,
+                                                                  epoch=test_epoch,
+                                                                  n=n, k=k,
+                                                                  mode=TEST)
+                                tmp_accuracies.append(tmp_accuracy)
 
                             valid_accuracies: list = []
                             for valid_epoch in range(50):
-                                valid_accuracies.append(calculate_accuracy(VALID))
+                                tmp_accuracy = calculate_accuracy(class_level_model=class_level_model,
+                                                                  node_level_model=node_level_model,
+                                                                  optimizer=optimizer,
+                                                                  classifier=classifier,
+                                                                  graph=graph,
+                                                                  adj_dense=adj_dense,
+                                                                  dataset=dataset,
+                                                                  epoch=valid_epoch,
+                                                                  n=n, k=k,
+                                                                  mode=VALID)
+                                valid_accuracies.append(tmp_accuracy)
 
                             valid_accuracy = np.array(valid_accuracies).mean(axis=0)
 
@@ -163,7 +176,8 @@ def train_and_test():
                                     break
 
                     print('Test Acc', np.array(test_accuracy_best).mean(axis=0))
-                    final_results[dataset]['{}-way {}-shot {}-repeat'.format(n, k, repeat)] = [np.array(test_accuracy_best).mean(axis=0)]
+                    final_results[dataset]['{}-way {}-shot {}-repeat'.format(n, k, repeat)] = [
+                        np.array(test_accuracy_best).mean(axis=0)]
                     json.dump(final_results[dataset], open('./TENT-result_{}.json'.format(dataset), 'w'))
 
                 final_accuracies: list = []
@@ -171,18 +185,24 @@ def train_and_test():
                     final_accuracies.append(final_results[dataset]['{}-way {}-shot {}-repeat'.format(n, k, i)][0])
 
                 final_results[dataset]['{}-way {}-shot'.format(n, k)] = [np.mean(final_accuracies)]
-                final_results[dataset]['{}-way {}-shot_print'.format(n, k)] = 'acc: {:.4f}'.format(np.mean(final_accuracies))
+                final_results[dataset]['{}-way {}-shot_print'.format(n, k)] = 'acc: {:.4f}'.format(
+                    np.mean(final_accuracies))
 
                 json.dump(final_results[dataset], open('./TENT-result_{}.json'.format(dataset), 'w'))
 
                 del node_level_model
                 del class_level_model
 
+        del graph
+        del adj_dense
 
-def calculate_accuracy(class_level_model: GNN4ClassLevel, node_level_model: GNN4NodeLevel,
+
+def calculate_accuracy(class_level_model: GNN4ClassLevel,
+                       node_level_model: GNN4NodeLevel,
                        optimizer: optim.Adam,
                        classifier: Linear,
                        graph: Graph,
+                       adj_dense,
                        dataset: str,
                        epoch: int,
                        n: int, k: int,
@@ -220,8 +240,8 @@ def calculate_accuracy(class_level_model: GNN4ClassLevel, node_level_model: GNN4
 
         class_pos_index: list = sampled_node_index[:k]
 
-        pos_graph_neighbors = torch.nonzero(graph.adjacency_matrix[class_pos_index, :].sum(0)).squeeze()
-        pos_graph_adj = graph.adjacency_matrix[pos_graph_neighbors, :][:, pos_graph_neighbors]
+        pos_graph_neighbors = torch.nonzero(adj_dense[class_pos_index, :].sum(0)).squeeze()
+        pos_graph_adj = adj_dense[pos_graph_neighbors, :][:, pos_graph_neighbors]
 
         pos_class_graph_adj = torch.eye(pos_graph_neighbors.shape[0] + 1, dtype=torch.float)
 
@@ -236,13 +256,13 @@ def calculate_accuracy(class_level_model: GNN4ClassLevel, node_level_model: GNN4
 
     target_graph_adj_and_feat = []
     for node in query_node_index:
-        if torch.nonzero(graph.adjacency_matrix[node, :]).shape[0] == 1:
-            pos_graph_adj = graph.adjacency_matrix[node, node].reshape([1, 1])
+        if torch.nonzero(adj_dense[node, :]).shape[0] == 1:
+            pos_graph_adj = adj_dense[node, node].reshape([1, 1])
             pos_graph_feat = node_features[node].unsqueeze(0)
         else:
-            pos_graph_neighbors = torch.nonzero(graph.adjacency_matrix[node, :]).squeeze()
-            pos_graph_neighbors = torch.nonzero(graph.adjacency_matrix[pos_graph_neighbors, :].sum(0)).squeeze()
-            pos_graph_adj = graph.adjacency_matrix[pos_graph_neighbors, :][:, pos_graph_neighbors]
+            pos_graph_neighbors = torch.nonzero(adj_dense[node, :]).squeeze()
+            pos_graph_neighbors = torch.nonzero(adj_dense[pos_graph_neighbors, :].sum(0)).squeeze()
+            pos_graph_adj = adj_dense[pos_graph_neighbors, :][:, pos_graph_neighbors]
             pos_graph_feat = node_features[pos_graph_neighbors]
 
         target_graph_adj_and_feat.append((pos_graph_adj, pos_graph_feat))
@@ -284,10 +304,12 @@ def calculate_accuracy(class_level_model: GNN4ClassLevel, node_level_model: GNN4
 
     similarities = []
     for j in range(query_size):
-        class_contras_loss, similarity = InforNCE_Loss(target_embs[j], class_ego_embs / taus.unsqueeze(-1), dataset=dataset,tau=0.5)
+        class_contras_loss, similarity = InforNCE_Loss(target_embs[j], class_ego_embs / taus.unsqueeze(-1),
+                                                       dataset=dataset, tau=0.5)
         similarities.append(similarity)
 
-    loss_supervised = loss_function(classifier(node_features[graph.train_node_index]), graph.labels[graph.train_node_index])
+    loss_supervised = loss_function(classifier(node_features[graph.train_node_index]),
+                                    graph.labels[graph.train_node_index])
 
     loss = loss_supervised
 
@@ -299,7 +321,7 @@ def calculate_accuracy(class_level_model: GNN4ClassLevel, node_level_model: GNN4
 
     acc_train = accuracy(torch.stack(similarities, 0).transpose(0, 1).reshape([n * query_size, -1]), labels_train)
 
-    if mode == 'valid' or mode == 'test' or (mode == 'train' and epoch % 250 == 249):
+    if mode == VALID or mode == TEST or (mode == TRAIN and epoch % 250 == 249):
         support_features = l2_normalize(node_features[pos_node_index].detach().cpu()).numpy()
         query_features = l2_normalize(node_features[query_node_index].detach().cpu()).numpy()
 
@@ -332,7 +354,8 @@ def calculate_accuracy(class_level_model: GNN4ClassLevel, node_level_model: GNN4
               'acc_train: {:.4f}'.format(acc_train.item()))
     return acc_train.item()
 
-   # return 0.0
+
+# return 0.0
 
 
 # entry of the program
