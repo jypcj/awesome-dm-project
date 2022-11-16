@@ -8,11 +8,11 @@ import scipy.sparse as sp
 import numpy as np
 import torch
 from sklearn import preprocessing
-from scipy.sparse import coo_matrix
+from scipy.sparse import coo_matrix, csr_matrix
 from numpy import ndarray
 
 
-from utils import normalize, sparse_matrix2torch_sparse_tensor
+from utils import normalize, sparse_matrix2torch_sparse_tensor, load_npz_to_sparse_graph, sparse_mx_to_torch_sparse_tensor
 
 '''
                            _ooOoo_
@@ -43,6 +43,7 @@ datasets = ['cora-full', 'Amazon_eletronics', 'dblp']
 CORA_FULL = 'cora-full'
 AMAZON_ELECTRONICS = 'Amazon_eletronics'
 DBLP = 'dblp'
+CORA_FULL_NPZ = "cora_full.npz"
 
 # directory of dataset
 dataset_dir = "./dataset/"
@@ -57,7 +58,6 @@ class Graph:
     def __init__(self, adjacency_matrix, features_matrix, labels,
                  train_node_index, valid_node_index, test_node_index,
                  class_train_dict, class_valid_dict, class_test_dict):
-
         self.adjacency_matrix: coo_matrix = adjacency_matrix
         self.features_matrix: ndarray = features_matrix
         self.labels: ndarray = labels
@@ -134,10 +134,24 @@ def data_preprocess(dataset: str) -> Graph:
         adjacency_matrix = sparse_matrix2torch_sparse_tensor(
             normalize(adjacency_matrix + sp.eye(adjacency_matrix.shape[0])))
         # print(labels)
-    '''
+
     elif dataset == 'cora-full':
-        pass
-    '''
+        adjacency_matrix, features_matrix, labels = load_npz_to_sparse_graph(dataset_dir + CORA_FULL_NPZ)
+
+        adjacency_matrix = normalize(adjacency_matrix.tocoo() + sp.eye(adjacency_matrix.shape[0]))
+        adjacency_matrix = sparse_mx_to_torch_sparse_tensor(adjacency_matrix)
+        features_matrix = features_matrix.todense()
+        features_matrix = torch.FloatTensor(features_matrix)
+        labels = torch.LongTensor(labels).squeeze()
+
+        all_class_list = train_class_list + valid_class_list + test_class_list
+
+        class_dict: dict = {}
+        for i in all_class_list:
+            class_dict[i] = []
+        for node_id, cls in enumerate(labels.numpy().tolist()):
+            class_dict[cls].append(node_id)
+
     # store node id
     train_node_index: list = list()
     valid_node_index: list = list()
@@ -164,7 +178,6 @@ def data_preprocess(dataset: str) -> Graph:
         for i, label in enumerate(labels.numpy().tolist()):
             if label == one:
                 class_test_dict[one].append(i)
-
     graph = Graph(adjacency_matrix, features_matrix, labels,
                   train_node_index, valid_node_index, test_node_index,
                   class_train_dict, class_valid_dict, class_test_dict)
@@ -172,17 +185,17 @@ def data_preprocess(dataset: str) -> Graph:
     return graph
 
 
-
-
 def print_content_to_file(data, file_name):
+    torch.set_printoptions(profile="full")
+    print(data)
     """ This function is used for debugging
 
     """
-    with open("./debug/" + file_name, 'w') as f:
-        f.write(data)
+    #with open("./debug/" + file_name, 'w') as f:
+     #   f.write(data)
 
 
 if __name__ == '__main__':
-    graph = data_preprocess(AMAZON_ELECTRONICS)
-    print(graph.features_matrix.mean())
+    graph = data_preprocess(CORA_FULL)
+    # print(graph.features_matrix.mean())
 
