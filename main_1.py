@@ -9,6 +9,7 @@ from torch import Tensor, optim
 from sklearn import metrics
 from sklearn.linear_model import LogisticRegression
 from data import data_preprocess, Graph
+from ema import EMA
 
 from model import GNN4ClassLevel, GNN4NodeLevel, Linear
 from utils import l2_normalize, accuracy, InforNCE_Loss
@@ -88,6 +89,8 @@ def train_and_test():
                     class_level_model: GNN4ClassLevel = GNN4ClassLevel(nfeat=args.hidden1,
                                                                        nhid=args.hidden2,
                                                                        dropout=args.dropout)
+
+
                     support_labels: Tensor = torch.zeros(n * k, dtype=torch.long)
                     query_labels: Tensor = torch.zeros(n * k, dtype=torch.long)
 
@@ -115,6 +118,12 @@ def train_and_test():
 
                         support_labels = support_labels.cuda()
                         query_labels = query_labels.cuda()
+
+                        # ema
+                        ema1 = EMA(node_level_model, 0.999)
+                        ema1.register()
+                        ema2 = EMA(class_level_model, 0.999)
+                        ema2.register()
 
                     def calculate_accuracy(epoch: int,
                                            n: int, k: int,
@@ -248,6 +257,9 @@ def train_and_test():
                                              labels_train)
 
                         if mode == 'valid' or mode == 'test' or (mode == 'train' and epoch % 250 == 249):
+                            # ema
+                            ema1.apply_shadow()
+                            ema2.apply_shadow()
                             support_features = l2_normalize(emb_features[pos_node_idx].detach().cpu()).numpy()
                             query_features = l2_normalize(emb_features[target_idx].detach().cpu()).numpy()
 
@@ -269,10 +281,17 @@ def train_and_test():
                             query_ys_pred = clf.predict(query_features)
 
                             acc_train = metrics.accuracy_score(query_labels, query_ys_pred)
+                            # ema
+                            ema1.restore()
+                            ema2.restore()
 
                         if mode == 'train':
                             loss.backward()
                             optimizer.step()
+
+                            # ema
+                            ema1.update()
+                            ema2.update()
 
                         if epoch % 250 == 249 and mode == 'train':
                             print('Epoch: {:04d}'.format(epoch + 1),
