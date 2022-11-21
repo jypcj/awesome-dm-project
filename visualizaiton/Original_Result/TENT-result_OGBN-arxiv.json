@@ -1,0 +1,78 @@
+{
+  "5-way 3-shot 0-repeat": [
+    0.7864
+  ],
+  "5-way 3-shot 1-repeat": [
+    0.7823999999999998
+  ],
+  "5-way 3-shot 2-repeat": [
+    0.7480000000000001
+  ],
+  "5-way 3-shot 3-repeat": [
+    0.7972
+  ],
+  "5-way 3-shot 4-repeat": [
+    0.7712
+  ],
+  "5-way 3-shot": [
+    0.5562
+  ],
+  "5-way 3-shot_print": "acc: 0.7770",
+  "5-way 5-shot 0-repeat": [
+    0.7956
+  ],
+  "5-way 5-shot 1-repeat": [
+    0.7968
+  ],
+  "5-way 5-shot 2-repeat": [
+    0.8248000000000001
+  ],
+  "5-way 5-shot 3-repeat": [
+    0.7796000000000001
+  ],
+  "5-way 5-shot 4-repeat": [
+    0.7879999999999999
+  ],
+  "5-way 5-shot": [
+    0.6296
+  ],
+  "5-way 5-shot_print": "acc: 0.7970",
+  "10-way 3-shot 0-repeat": [
+    0.6634
+  ],
+  "10-way 3-shot 1-repeat": [
+    0.6487999999999999
+  ],
+  "10-way 3-shot 2-repeat": [
+    0.6624
+  ],
+  "10-way 3-shot 3-repeat": [
+    0.6758000000000002
+  ],
+  "10-way 3-shot 4-repeat": [
+    0.6648
+  ],
+  "10-way 3-shot": [
+    0.4113
+  ],
+  "10-way 3-shot_print": "acc: 0.6630",
+  "10-way 5-shot 0-repeat": [
+    0.7004
+  ],
+  "10-way 5-shot 1-repeat": [
+    0.6768000000000001
+  ],
+  "10-way 5-shot 2-repeat": [
+    0.7006
+  ],
+  "10-way 5-shot 3-repeat": [
+    0.6966
+  ],
+  "10-way 5-shot 4-repeat": [
+    0.7066
+  ],
+  "10-way 5-shot": [
+    0.4473
+  ],
+  "10-way 5-shot_print": "acc: 0.6962"
+}
